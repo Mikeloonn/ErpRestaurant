@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { Wallet, ArrowDownRight, ArrowUpRight, Lock, Unlock, FileText, X, Search, Filter } from 'lucide-react';
+import { Wallet, ArrowDownRight, ArrowUpRight, Lock, Unlock, FileText, X, Search } from 'lucide-react';
 import { Order } from '../types';
+import { formatCurrency, formatRaw, toCents } from '../utils/currency';
 
 export const CashRegisterView: React.FC = () => {
   const { currentShift, openShift, closeShift, addCashTransaction, cashTransactions, currentUser, orders } = useAppContext();
@@ -62,7 +63,7 @@ export const CashRegisterView: React.FC = () => {
   const handleOpenShift = (e: React.FormEvent) => {
     e.preventDefault();
     if (amount) {
-      openShift(parseFloat(amount));
+      openShift(toCents(parseFloat(amount)));
       setAmount('');
     }
   };
@@ -78,7 +79,7 @@ export const CashRegisterView: React.FC = () => {
     if (amount && reason) {
       addCashTransaction({
         type: txType,
-        amount: parseFloat(amount),
+        amount: toCents(parseFloat(amount)),
         reason,
         userId: currentUser?.id || ''
       });
@@ -120,7 +121,7 @@ export const CashRegisterView: React.FC = () => {
                   <span className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500 font-medium">S/</span>
                   <input
                     type="number"
-                    step="0.1"
+                    step="0.01"
                     required
                     value={amount}
                     onChange={e => setAmount(e.target.value)}
@@ -141,25 +142,25 @@ export const CashRegisterView: React.FC = () => {
                 <div className="space-y-3 mb-4">
                   <div className="flex justify-between text-zinc-600">
                     <span>Monto Inicial:</span>
-                    <span className="font-medium">S/ {breakdown.initial.toFixed(2)}</span>
+                    <span className="font-medium">{formatCurrency(breakdown.initial)}</span>
                   </div>
                   <div className="flex justify-between text-green-600">
                     <span>Ingresos (Efectivo):</span>
-                    <span className="font-medium">+ S/ {breakdown.incomeCash.toFixed(2)}</span>
+                    <span className="font-medium">+ {formatCurrency(breakdown.incomeCash)}</span>
                   </div>
                   <div className="flex justify-between text-blue-600">
                     <span>Ingresos (Yape/Tarjeta):</span>
-                    <span className="font-medium">+ S/ {breakdown.incomeOther.toFixed(2)}</span>
+                    <span className="font-medium">+ {formatCurrency(breakdown.incomeOther)}</span>
                   </div>
                   <div className="flex justify-between text-orange-600">
                     <span>Egresos (Gastos):</span>
-                    <span className="font-medium">- S/ {breakdown.expense.toFixed(2)}</span>
+                    <span className="font-medium">- {formatCurrency(breakdown.expense)}</span>
                   </div>
                 </div>
                 
                 <div className="pt-4 border-t border-zinc-200">
                   <p className="text-sm text-zinc-500 mb-1">Efectivo Esperado en Caja</p>
-                  <p className="text-4xl font-bold text-zinc-800 tracking-tight">S/ {breakdown.totalCash.toFixed(2)}</p>
+                  <p className="text-4xl font-bold text-zinc-800 tracking-tight">{formatCurrency(breakdown.totalCash)}</p>
                 </div>
               </div>
               <button onClick={handleCloseShift} className="w-full bg-red-500 hover:bg-red-600 text-white py-3 rounded-xl font-bold transition-colors">
@@ -196,7 +197,7 @@ export const CashRegisterView: React.FC = () => {
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500">S/</span>
                   <input
                     type="number"
-                    step="0.1"
+                    step="0.01"
                     required
                     value={amount}
                     onChange={e => setAmount(e.target.value)}
@@ -319,7 +320,7 @@ export const CashRegisterView: React.FC = () => {
                     </div>
                   </div>
                   <div className={`font-mono font-bold text-lg ${tx.type === 'Ingreso' ? 'text-green-600' : 'text-orange-600'}`}>
-                    {tx.type === 'Ingreso' ? '+' : '-'} S/ {tx.amount.toFixed(2)}
+                    {tx.type === 'Ingreso' ? '+' : '-'} {formatCurrency(tx.amount)}
                   </div>
                 </div>
               )})}
@@ -381,7 +382,7 @@ export const CashRegisterView: React.FC = () => {
                         <span className="text-xs text-zinc-400 italic">Nota: {item.notes}</span>
                       )}
                     </div>
-                    <span className="font-medium text-zinc-800">S/ {(item.price * item.quantity).toFixed(2)}</span>
+                    <span className="font-medium text-zinc-800">{formatCurrency(item.price * item.quantity)}</span>
                   </div>
                 ))}
               </div>
@@ -389,7 +390,7 @@ export const CashRegisterView: React.FC = () => {
 
             <div className="p-4 border-t border-zinc-200 bg-zinc-50 flex justify-between items-center">
               <span className="text-zinc-500 font-medium">Total Cobrado</span>
-              <span className="text-2xl font-bold text-green-600">S/ {selectedOrder.total.toFixed(2)}</span>
+              <span className="text-2xl font-bold text-green-600">{formatCurrency(selectedOrder.total)}</span>
             </div>
           </div>
         </div>

@@ -1,5 +1,5 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
-import { User, Role, Table, Category, Product, Order, KardexMovement, CashTransaction, CashShift, PaymentMethod } from '../types';
+import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
+import { User, Table, Category, Product, Order, KardexMovement, CashTransaction, CashShift, PaymentMethod } from '../types';
 
 interface AppState {
   currentUser: User | null;
@@ -57,16 +57,19 @@ const initialCategories: Category[] = [
 ];
 
 const initialProducts: Product[] = [
-  { id: 'p1', categoryId: 'c1', name: 'Cuarto de Broaster', price: 15.0, stock: 50, minStock: 10, modifiers: ['Pechuga', 'Pierna', 'Ala', 'Ensalada cocida', 'Ensalada fresca', 'Sin ensalada'] },
-  { id: 'p2', categoryId: 'c1', name: 'Octavo de Broaster', price: 10.0, stock: 50, minStock: 10, modifiers: ['Pechuga', 'Pierna', 'Ala', 'Ensalada cocida', 'Ensalada fresca', 'Sin ensalada'] },
-  { id: 'p3', categoryId: 'c2', name: 'Gaseosa 1L', price: 8.0, stock: 24, minStock: 12, modifiers: ['Helada', 'Sin helar'] },
-  { id: 'p4', categoryId: 'c2', name: 'Chicha Morada 1L', price: 10.0, stock: 15, minStock: 5, modifiers: [] },
-  { id: 'p5', categoryId: 'c3', name: 'Porción de Papas', price: 6.0, stock: 100, minStock: 20, modifiers: ['Bien fritas', 'Normales'] },
+  { id: 'p1', categoryId: 'c1', name: 'Cuarto de Broaster', price: 1500, stock: 50, minStock: 10, modifiers: ['Pechuga', 'Pierna', 'Ala', 'Ensalada cocida', 'Ensalada fresca', 'Sin ensalada'] },
+  { id: 'p2', categoryId: 'c1', name: 'Octavo de Broaster', price: 1000, stock: 50, minStock: 10, modifiers: ['Pechuga', 'Pierna', 'Ala', 'Ensalada cocida', 'Ensalada fresca', 'Sin ensalada'] },
+  { id: 'p3', categoryId: 'c2', name: 'Gaseosa 1L', price: 800, stock: 24, minStock: 12, modifiers: ['Helada', 'Sin helar'] },
+  { id: 'p4', categoryId: 'c2', name: 'Chicha Morada 1L', price: 1000, stock: 15, minStock: 5, modifiers: [] },
+  { id: 'p5', categoryId: 'c3', name: 'Porción de Papas', price: 600, stock: 100, minStock: 20, modifiers: ['Bien fritas', 'Normales'] },
 ];
+
+const STORAGE_KEY = 'broasteria_erp_data';
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const [isLoaded, setIsLoaded] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [users, setUsers] = useState<User[]>(initialUsers);
   const [tables, setTables] = useState<Table[]>(initialTables);
@@ -76,6 +79,44 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [kardex, setKardex] = useState<KardexMovement[]>([]);
   const [cashTransactions, setCashTransactions] = useState<CashTransaction[]>([]);
   const [currentShift, setCurrentShift] = useState<CashShift | null>(null);
+
+  // Cargar datos al iniciar
+  useEffect(() => {
+    const savedData = localStorage.getItem(STORAGE_KEY);
+    if (savedData) {
+      try {
+        const parsed = JSON.parse(savedData);
+        if (parsed.users) setUsers(parsed.users);
+        if (parsed.tables) setTables(parsed.tables);
+        if (parsed.categories) setCategories(parsed.categories);
+        if (parsed.products) setProducts(parsed.products);
+        if (parsed.orders) setOrders(parsed.orders);
+        if (parsed.kardex) setKardex(parsed.kardex);
+        if (parsed.cashTransactions) setCashTransactions(parsed.cashTransactions);
+        if (parsed.currentShift) setCurrentShift(parsed.currentShift);
+      } catch (e) {
+        console.error("Error loading data from localStorage", e);
+      }
+    }
+    setIsLoaded(true);
+  }, []);
+
+  // Guardar datos cuando cambien
+  useEffect(() => {
+    if (isLoaded) {
+      const dataToSave = {
+        users,
+        tables,
+        categories,
+        products,
+        orders,
+        kardex,
+        cashTransactions,
+        currentShift
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(dataToSave));
+    }
+  }, [users, tables, categories, products, orders, kardex, cashTransactions, currentShift, isLoaded]);
 
   const login = (username: string, password: string) => {
     const user = users.find(u => u.username === username && u.password === password);
@@ -252,13 +293,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         }
         updatedBatches = updatedBatches.filter(b => b.quantity > 0);
       } else if (diff > 0) {
-        // Adding stock without a specific batch (fallback for manual adjustment without date)
-        // Usually, addProductBatch should be used instead.
-        // We'll just add a generic batch with no expiration if it happens.
         updatedBatches.push({
           id: `b-${Date.now()}`,
           quantity: diff,
-          expirationDate: '2099-12-31', // Fallback
+          expirationDate: '2099-12-31',
           dateAdded: new Date().toISOString()
         });
       }
@@ -340,7 +378,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       finalAmount,
       status: 'Cerrada'
     });
-    // In a real app, we would save this to a history array
     setCurrentShift(null);
   };
 
@@ -367,8 +404,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const deleteCategory = (id: string) => {
     setCategories(prev => prev.filter(c => c.id !== id));
-    // Also delete products in this category? For now, let's just delete the category.
-    // In a real app, you might want to prevent deletion if products exist, or cascade delete.
   };
 
   const addProduct = (productData: Omit<Product, 'id'>) => {

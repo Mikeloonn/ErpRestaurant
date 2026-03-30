@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { Category, Product } from '../types';
 import { Plus, Edit2, Trash2, X, Check, Layers, Package } from 'lucide-react';
+import { formatCurrency, formatRaw, toCents } from '../utils/currency';
 
 export const CatalogView: React.FC = () => {
   const { categories, products, addCategory, updateCategory, deleteCategory, addProduct, updateProduct, deleteProduct } = useAppContext();
@@ -171,12 +172,14 @@ const ProductsManager = ({ products, categories, onAdd, onUpdate, onDelete }: {
   const [isEditing, setIsEditing] = useState<string | null>(null);
   const [isAdding, setIsAdding] = useState(false);
   const [formData, setFormData] = useState<Partial<Product>>({});
+  const [priceInput, setPriceInput] = useState('');
   const [modifiersInput, setModifiersInput] = useState('');
 
   const handleAddClick = () => {
     setIsAdding(true);
     setIsEditing(null);
     setFormData({ name: '', price: 0, stock: 0, minStock: 0, categoryId: categories[0]?.id || '', modifiers: [] });
+    setPriceInput('0');
     setModifiersInput('');
   };
 
@@ -184,6 +187,7 @@ const ProductsManager = ({ products, categories, onAdd, onUpdate, onDelete }: {
     setIsEditing(product.id);
     setIsAdding(false);
     setFormData({ ...product });
+    setPriceInput(formatRaw(product.price));
     setModifiersInput(product.modifiers?.join(', ') || '');
   };
 
@@ -191,14 +195,16 @@ const ProductsManager = ({ products, categories, onAdd, onUpdate, onDelete }: {
     setIsAdding(false);
     setIsEditing(null);
     setFormData({});
+    setPriceInput('');
     setModifiersInput('');
   };
 
   const handleSave = () => {
-    if (!formData.name || !formData.categoryId || formData.price === undefined) return;
+    if (!formData.name || !formData.categoryId || priceInput === '') return;
     
     const productData = {
       ...formData,
+      price: toCents(parseFloat(priceInput)),
       modifiers: modifiersInput.split(',').map(m => m.trim()).filter(m => m !== '')
     } as Omit<Product, 'id'>;
 
@@ -255,10 +261,10 @@ const ProductsManager = ({ products, categories, onAdd, onUpdate, onDelete }: {
               <label className="block text-sm font-medium text-zinc-700 mb-1">Precio (S/)</label>
               <input
                 type="number"
-                step="0.1"
+                step="0.01"
                 min="0"
-                value={formData.price || ''}
-                onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) || 0 })}
+                value={priceInput}
+                onChange={(e) => setPriceInput(e.target.value)}
                 className="w-full p-2 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-orange-500"
               />
             </div>
@@ -327,7 +333,7 @@ const ProductsManager = ({ products, categories, onAdd, onUpdate, onDelete }: {
                     )}
                   </td>
                   <td className="p-4 text-zinc-600">{category?.name || '---'}</td>
-                  <td className="p-4 font-medium">S/ {product.price.toFixed(2)}</td>
+                  <td className="p-4 font-medium">{formatCurrency(product.price)}</td>
                   <td className="p-4">
                     <span className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-medium ${
                       product.stock <= 0 ? 'bg-red-100 text-red-800' :

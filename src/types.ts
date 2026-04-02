@@ -33,7 +33,7 @@ export interface Product {
   id: string;
   categoryId: string;
   name: string;
-  price: number; // En céntimos (ej: 1550 para S/ 15.50)
+  price: number | string; // En céntimos (puede venir como string de BIGINT)
   stock: number;
   minStock: number;
   modifiers: string[];
@@ -44,7 +44,7 @@ export interface OrderItem {
   id: string;
   productId: string;
   name: string;
-  price: number; // En céntimos
+  price: number | string; // En céntimos
   quantity: number;
   notes: string;
   isTakeaway?: boolean;
@@ -64,7 +64,7 @@ export interface Order {
   customerPhone?: string;
   items: OrderItem[];
   status: 'Abierta' | 'Precuenta' | 'Pagada' | 'Anulada';
-  total: number; // En céntimos
+  total: number | string; // En céntimos
   paymentMethod?: PaymentMethod;
   createdAt: string;
   updatedAt?: string;
@@ -83,7 +83,7 @@ export interface KardexMovement {
 export interface CashTransaction {
   id: string;
   type: 'Ingreso' | 'Egreso';
-  amount: number; // En céntimos
+  amount: number | string; // En céntimos
   reason: string;
   date: string;
   userId: string;
@@ -97,7 +97,7 @@ export interface CashShift {
   closedAt?: string;
   openedBy: string;
   closedBy?: string;
-  initialAmount: number; // En céntimos
-  finalAmount?: number; // En céntimos
+  initialAmount: number | string; // En céntimos
+  finalAmount?: number | string; // En céntimos
   status: 'Abierta' | 'Cerrada';
 }

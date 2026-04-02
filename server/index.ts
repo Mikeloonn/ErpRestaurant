@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { pool } from './db';
+import { errorHandler } from './middleware/error';
 
 dotenv.config();
 
@@ -25,16 +26,15 @@ app.get('/health', async (req, res) => {
 
 /**
  * CREAR PEDIDO (Endpoint Profesional con Transacción)
- * 1. Empieza transacción (BEGIN)
- * 2. Valida stock y precios reales
- * 3. Crea el pedido
- * 4. Inserta items
- * 5. Resta stock de forma atómica
- * 6. Finaliza transacción (COMMIT)
  */
-app.post('/api/orders', async (req, res) => {
+app.post('/api/orders', async (req, res, next) => {
   const { type, tableId, customerName, items } = req.body;
   
+  // VALIDACIÓN BÁSICA (Sugerencia de Mejora #2)
+  if (!items || items.length === 0) {
+    return res.status(400).json({ error: 'El pedido debe contener al menos un producto' });
+  }
+
   const client = await pool.connect(); // Obtenemos una conexión del pool
 
   try {
@@ -46,7 +46,7 @@ app.post('/api/orders', async (req, res) => {
 
     for (const item of items) {
       const pResult = await client.query(
-        'SELECT id, name, price, stock FROM products WHERE id = $1 FOR UPDATE', // "FOR UPDATE" bloquea la fila para evitar que otro reste stock al mismo tiempo
+        'SELECT id, name, price, stock FROM products WHERE id = $1 FOR UPDATE', 
         [item.productId]
       );
       
@@ -112,13 +112,16 @@ app.post('/api/orders', async (req, res) => {
 
   } catch (err: any) {
     await client.query('ROLLBACK'); // --- SI ALGO FALLÓ, DESHACEMOS TODO ---
-    console.error("❌ Transaction Error:", err.message);
-    res.status(400).json({ error: err.message });
+    next(err); // Pasamos el error al middleware global (Sugerencia de Mejora #1)
   } finally {
     client.release(); // Siempre liberamos la conexión al pool
   }
 });
 
+// USAR EL MANEJADOR DE ERRORES GLOBAL
+app.use(errorHandler);
+
 app.listen(port, () => {
   console.log(`🚀 Servidor Backend Independiente en http://localhost:${port}`);
 });
+

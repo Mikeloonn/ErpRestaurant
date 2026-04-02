@@ -8,9 +8,10 @@ export const LoginScreen: React.FC = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (login(username, password)) {
+    const success = await login(username, password);
+    if (success) {
       setError('');
     } else {
       setError('Usuario o contraseña incorrectos');
@@ -74,8 +75,7 @@ export const LoginScreen: React.FC = () => {
         </form>
 
         <div className="mt-8 text-center text-zinc-500 text-sm">
-          <p>Usuarios de prueba (usuario / contraseña):</p>
-          <p>admin / 123 | juan / 123 | maria / 123</p>
+          <p>Usa tus credenciales de Supabase</p>
         </div>
       </div>
     </div>

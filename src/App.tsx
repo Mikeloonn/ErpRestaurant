@@ -6,6 +6,7 @@
 import { AppProvider, useAppContext } from './context/AppContext';
 import { LoginScreen } from './components/LoginScreen';
 import { MainLayout } from './components/MainLayout';
+import { Toaster } from 'sonner';
 
 const AppContent = () => {
   const { currentUser } = useAppContext();
@@ -15,6 +16,7 @@ const AppContent = () => {
 export default function App() {
   return (
     <AppProvider>
+      <Toaster position="top-right" richColors />
       <AppContent />
     </AppProvider>
   );

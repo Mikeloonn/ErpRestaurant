@@ -1,16 +1,24 @@
 import { pool } from '../db';
 
 export const createOrderTransaction = async (orderData: any) => {
-  const { type, tableId, customerName, items } = orderData;
+  const { type, tableId, customerName, clientOrderId, items } = orderData;
   const client = await pool.connect();
 
   try {
+    // 1. --- IDEMPOTENCIA ---
+    // Si ya existe un pedido con ese clientOrderId, lo devolvemos tal cual
+    const existing = await client.query('SELECT id, total, status FROM orders WHERE client_order_id = $1', [clientOrderId]);
+    if (existing.rows.length > 0) {
+      console.log(`⚠️ IDEMPOTENCIA DETECTADA: Pedido ${clientOrderId} ya procesado.`);
+      return { ...existing.rows[0], idempotent: true };
+    }
+
     await client.query('BEGIN');
 
     let totalCents = 0;
     const itemsToInsert = [];
 
-    // 1. Validar Stock y Calcular Total
+    // 2. Validar Stock y Calcular Total
     for (const item of items) {
       const pResult = await client.query(
         'SELECT id, name, price, stock FROM products WHERE id = $1 FOR UPDATE',
@@ -27,15 +35,15 @@ export const createOrderTransaction = async (orderData: any) => {
       itemsToInsert.push({ ...item, price: product.price, name: product.name });
     }
 
-    // 2. Insertar Pedido
+    // 3. Insertar Pedido con su Idempotency Key
     const orderInsert = await client.query(
-      `INSERT INTO orders (type, table_id, customer_name, total, status) 
-       VALUES ($1, $2, $3, $4, 'Abierta') RETURNING id`,
-      [type, tableId || null, customerName || null, totalCents]
+      `INSERT INTO orders (type, table_id, customer_name, client_order_id, total, status) 
+       VALUES ($1, $2, $3, $4, $5, 'Abierta') RETURNING id`,
+      [type, tableId || null, customerName || null, clientOrderId, totalCents]
     );
     const orderId = orderInsert.rows[0].id;
 
-    // 3. Items y Stock
+    // 4. Items y Stock
     for (const item of itemsToInsert) {
       await client.query(
         `INSERT INTO order_items (order_id, product_id, name, price, quantity, notes, is_takeaway)

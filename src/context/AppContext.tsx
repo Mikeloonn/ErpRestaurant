@@ -157,10 +157,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   // --- GESTIÓN DE PEDIDOS (TRAVÉS DEL BACKEND) ---
   const createOrder = async (orderData: Omit<Order, 'id' | 'createdAt' | 'status'>) => {
     try {
+      // GENERAR ID ÚNICO DE CLIENTE PARA IDEMPOTENCIA
+      const clientOrderId = crypto.randomUUID();
+
       const response = await fetch('http://localhost:3001/api/orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(orderData)
+        body: JSON.stringify({ ...orderData, clientOrderId })
       });
 
       if (!response.ok) {

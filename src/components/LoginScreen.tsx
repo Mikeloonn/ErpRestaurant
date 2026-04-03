@@ -7,15 +7,23 @@ export const LoginScreen: React.FC = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    const success = await login(username, password);
-    if (success) {
-      setError('');
-    } else {
-      setError('Usuario o contraseña incorrectos');
-      setPassword('');
+    if (isLoading) return;
+
+    setIsLoading(true);
+    setError('');
+
+    try {
+      const success = await login(username, password);
+      if (!success) {
+        setError('Usuario o contraseña incorrectos');
+        setPassword('');
+      }
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -68,9 +76,19 @@ export const LoginScreen: React.FC = () => {
 
           <button
             type="submit"
-            className="w-full flex justify-center py-3 px-4 border border-transparent rounded-xl shadow-sm text-sm font-medium text-white bg-orange-500 hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 focus:ring-offset-zinc-900 transition-colors"
+            disabled={isLoading}
+            className={`w-full flex justify-center py-3 px-4 border border-transparent rounded-xl shadow-sm text-sm font-medium text-white transition-all ${
+              isLoading 
+                ? 'bg-zinc-600 cursor-not-allowed opacity-70' 
+                : 'bg-orange-500 hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 focus:ring-offset-zinc-900'
+            }`}
           >
-            Ingresar
+            {isLoading ? (
+              <span className="flex items-center gap-2">
+                <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                Verificando...
+              </span>
+            ) : 'Ingresar'}
           </button>
         </form>
 

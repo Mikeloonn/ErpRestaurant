@@ -248,10 +248,23 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const createOrder = async (orderData: Omit<Order, 'id' | 'createdAt' | 'status'>) => {
     try {
       const clientOrderId = crypto.randomUUID();
+      
+      // LIMPIAR DATOS: Asegurar que los campos opcionales no sean undefined
+      const cleanData = {
+        ...orderData,
+        clientOrderId,
+        customerName: orderData.customerName || null,
+        tableId: orderData.tableId || null,
+        items: orderData.items.map(item => ({
+          ...item,
+          notes: item.notes || null
+        }))
+      };
+
       const response = await fetch(`${API_URL}/api/orders`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...orderData, clientOrderId })
+        body: JSON.stringify(cleanData)
       });
 
       if (!response.ok) {

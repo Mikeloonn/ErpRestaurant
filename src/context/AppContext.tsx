@@ -66,11 +66,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const { data: catData } = await supabase.from('categories').select('*');
       if (catData) setCategories(catData as Category[]);
 
-      // 1. Cargar lotes primero
       const { data: allBatchesData } = await supabase.from('product_batches').select('*');
       const allBatches = allBatchesData || [];
 
-      // 2. Cargar productos y pegarles sus lotes
       const { data: prodData } = await supabase.from('products').select('*');
       if (prodData) {
         setProducts(prodData.map((p: any) => ({
@@ -300,12 +298,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const addKardexMovement = async (movement: Omit<KardexMovement, 'id' | 'date'>) => {
+    // CORRECCIÓN: Si no hay un ID de usuario válido, enviamos null (Supabase lo permite)
+    const validUserId = (movement.userId && movement.userId.length > 10) ? movement.userId : null;
+
     const { error } = await supabase.from('kardex_movements').insert([{
       product_id: movement.productId,
       type: movement.type,
       quantity: movement.quantity,
       reason: movement.reason,
-      user_id: movement.userId
+      user_id: validUserId
     }]);
     if (error) throw error;
     fetchData();
@@ -319,7 +320,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const addProductBatch = async (productId: string, quantity: number, expirationDate: string) => {
     try {
-      // 1. Insertar el lote en Supabase
       const { error: batchError } = await supabase.from('product_batches').insert([{
         product_id: productId,
         quantity,
@@ -327,25 +327,21 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       }]);
       if (batchError) throw batchError;
 
-      // 2. Obtener stock real actual de la base de datos
       const { data: prodData } = await supabase.from('products').select('stock').eq('id', productId).single();
       const currentStock = prodData ? Number(prodData.stock) : 0;
 
-      // 3. Actualizar el stock sumando el nuevo lote
       await updateProductStock(productId, currentStock + quantity);
 
-      // 4. Registrar en el Kardex
+      // CORRECCIÓN: Pasar el ID real del usuario o null
       await addKardexMovement({
         productId,
         type: 'Entrada',
         quantity,
         reason: `Ingreso de Lote (Vence: ${expirationDate})`,
-        userId: currentUser?.id || 'system'
+        userId: currentUser?.id || ''
       });
 
       toast.success('Lote registrado e inventario actualizado');
-      
-      // 5. RECARGAR TODO PARA FORZAR LA ACTUALIZACIÓN DE LA UI
       await fetchData();
     } catch (err: any) {
       toast.error('Error al registrar lote: ' + err.message);
@@ -384,12 +380,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const addCashTransaction = async (transaction: Partial<CashTransaction>) => {
+    const validUserId = (transaction.userId && transaction.userId.length > 10) ? transaction.userId : (currentUser?.id || null);
+
     const { error } = await supabase.from('cash_transactions').insert([{
-      shift_id: currentShift?.id || transaction.shiftId,
+      shift_id: currentShift?.id || (transaction as any).shiftId,
       type: transaction.type,
       amount: transaction.amount,
       reason: transaction.reason,
-      user_id: transaction.userId || currentUser?.id,
+      user_id: validUserId,
       order_id: transaction.orderId,
       payment_method: transaction.paymentMethod
     }]);

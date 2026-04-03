@@ -248,8 +248,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const createOrder = async (orderData: Omit<Order, 'id' | 'createdAt' | 'status'>) => {
     try {
       const clientOrderId = crypto.randomUUID();
-      
-      // LIMPIAR DATOS: Asegurar que los campos opcionales no sean undefined
       const cleanData = {
         ...orderData,
         clientOrderId,
@@ -277,8 +275,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       }
 
       const newOrder = await response.json();
-      fetchData();
-      toast.success('Pedido creado');
+      await fetchData();
+      toast.success('Pedido enviado a cocina');
       return newOrder;
     } catch (err: any) {
       toast.error(err.message);
@@ -287,30 +285,48 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const updateOrderStatus = async (id: string, status: Order['status'], paymentData?: { method: PaymentMethod, customerName?: string, customerDocument?: string, customerAddress?: string }) => {
-    const order = orders.find(o => o.id === id);
-    if (!order) return;
+    try {
+      const order = orders.find(o => o.id === id);
+      if (!order) return;
 
-    const updateData: any = { status };
-    if (paymentData) {
-      updateData.payment_method = paymentData.method;
-      updateData.customer_name = paymentData.customerName || order.customerName;
-      updateData.customer_document = paymentData.customerDocument || order.customerDocument;
-      updateData.customer_address = paymentData.customerAddress || order.customerAddress;
+      const updateData: any = { status };
+      if (paymentData) {
+        updateData.payment_method = paymentData.method;
+        updateData.customer_name = paymentData.customerName || order.customerName;
+        updateData.customer_document = paymentData.customerDocument || order.customerDocument;
+        updateData.customer_address = paymentData.customerAddress || order.customerAddress;
+      }
+
+      // 1. Actualizar el pedido en Supabase
+      const { error: orderError } = await supabase.from('orders').update(updateData).eq('id', id);
+      if (orderError) throw orderError;
+
+      // 2. Si es Mesa y se libera (Pagada/Anulada), actualizar la mesa
+      if (order.tableId && (status === 'Pagada' || status === 'Anulada')) {
+        await updateTableStatus(order.tableId, 'Libre', undefined);
+      } else if (order.tableId && status === 'Precuenta') {
+        await updateTableStatus(order.tableId, 'Precuenta', order.id);
+      }
+
+      // 3. Si se paga, registrar en caja
+      if (status === 'Pagada') {
+        await addCashTransaction({
+          type: 'Ingreso',
+          amount: order.total,
+          reason: `Pago de Pedido #${order.id.slice(-4)}`,
+          orderId: order.id,
+          paymentMethod: paymentData?.method
+        });
+        toast.success('Pago registrado y mesa liberada');
+      } else if (status === 'Precuenta') {
+        toast.success('Precuenta marcada en mesa');
+      }
+
+      // 4. RECARGAR TODO PARA ACTUALIZAR LA INTERFAZ
+      await fetchData();
+    } catch (err: any) {
+      toast.error('Error al actualizar estado: ' + err.message);
     }
-
-    const { error } = await supabase.from('orders').update(updateData).eq('id', id);
-    if (error) throw error;
-
-    if (status === 'Pagada') {
-      await addCashTransaction({
-        type: 'Ingreso',
-        amount: order.total,
-        reason: `Pago de Pedido #${order.id.slice(-4)}`,
-        orderId: order.id,
-        paymentMethod: paymentData?.method
-      });
-    }
-    fetchData();
   };
 
   const updateOrder = async (id: string, newItems: Order['items'], additionalTotal: number, customerName?: string) => {
@@ -322,12 +338,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       updated_at: new Date().toISOString()
     }).eq('id', id);
     if (error) throw error;
-    fetchData();
+    await fetchData();
   };
 
   const addKardexMovement = async (movement: Omit<KardexMovement, 'id' | 'date'>) => {
     const validUserId = (movement.userId && movement.userId.length > 10) ? movement.userId : null;
-
     const { error } = await supabase.from('kardex_movements').insert([{
       product_id: movement.productId,
       type: movement.type,
@@ -353,12 +368,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         expiration_date: expirationDate
       }]);
       if (batchError) throw batchError;
-
       const { data: prodData } = await supabase.from('products').select('stock').eq('id', productId).single();
       const currentStock = prodData ? Number(prodData.stock) : 0;
-
       await updateProductStock(productId, currentStock + quantity);
-
       await addKardexMovement({
         productId,
         type: 'Entrada',
@@ -366,8 +378,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         reason: `Ingreso de Lote (Vence: ${expirationDate})`,
         userId: currentUser?.id || ''
       });
-
-      toast.success('Lote registrado e inventario actualizado');
+      toast.success('Lote registrado');
       await fetchData();
     } catch (err: any) {
       toast.error('Error al registrar lote: ' + err.message);
@@ -407,7 +418,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const addCashTransaction = async (transaction: Partial<CashTransaction>) => {
     const validUserId = (transaction.userId && transaction.userId.length > 10) ? transaction.userId : (currentUser?.id || null);
-
     const { error } = await supabase.from('cash_transactions').insert([{
       shift_id: currentShift?.id || (transaction as any).shiftId,
       type: transaction.type,

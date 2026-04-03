@@ -41,6 +41,10 @@ export const OrderTaking: React.FC<OrderTakingProps> = ({
     currentUser
   } = useOrder(table, existingOrderId, orderType as OrderType);
 
+  // Lógica para detectar si hay cambios reales en el nombre (ignorando nulos/vacíos)
+  const hasNameChanged = existingOrder ? (customerName || '') !== (existingOrder.customerName || '') : false;
+  const hasUnsavedChanges = cart.length > 0 || hasNameChanged;
+
   return (
     <div className="flex w-full h-full">
       {/* Menu Section */}
@@ -124,7 +128,7 @@ export const OrderTaking: React.FC<OrderTakingProps> = ({
                       <span className="text-[10px] font-bold text-orange-500 uppercase">Para Llevar</span>
                     )}
                   </div>
-                  <span>{formatCurrency(item.price * item.quantity)}</span>
+                  <span>{formatCurrency(Number(item.price) * item.quantity)}</span>
                 </div>
               ))}
             </div>
@@ -137,7 +141,7 @@ export const OrderTaking: React.FC<OrderTakingProps> = ({
                 <div key={item.cartId} className="flex flex-col mb-4 bg-zinc-50 p-3 rounded-xl border border-zinc-100">
                   <div className="flex justify-between items-start mb-2">
                     <span className="font-bold text-zinc-800">{item.name}</span>
-                    <span className="font-bold text-zinc-800">{formatCurrency(item.price * item.quantity)}</span>
+                    <span className="font-bold text-zinc-800">{formatCurrency(Number(item.price) * item.quantity)}</span>
                   </div>
                   <div className="flex items-center justify-between mt-2">
                     <div className="flex items-center gap-3 bg-white border border-zinc-200 rounded-lg p-1">
@@ -192,7 +196,7 @@ export const OrderTaking: React.FC<OrderTakingProps> = ({
           </div>
           
           <div className="grid grid-cols-2 gap-2">
-            {(cart.length > 0 || (existingOrder && customerName !== existingOrder.customerName)) && (
+            {hasUnsavedChanges && (
               <button 
                 onClick={() => handleSendOrder(onBack)}
                 className="col-span-2 bg-orange-500 hover:bg-orange-600 text-white py-4 rounded-xl font-bold text-lg transition-colors flex items-center justify-center gap-2"
@@ -208,7 +212,7 @@ export const OrderTaking: React.FC<OrderTakingProps> = ({
               </button>
             )}
             
-            {existingOrder && cart.length === 0 && customerName === existingOrder.customerName && (existingOrder.status === 'Abierta' || existingOrder.status === 'Precuenta') && (
+            {existingOrder && !hasUnsavedChanges && (existingOrder.status === 'Abierta' || existingOrder.status === 'Precuenta') && (
               <button 
                 onClick={() => handlePrecuenta(onBack)}
                 className="col-span-2 bg-blue-500 hover:bg-blue-600 text-white py-4 rounded-xl font-bold text-lg transition-colors"
@@ -217,7 +221,7 @@ export const OrderTaking: React.FC<OrderTakingProps> = ({
               </button>
             )}
 
-            {existingOrder && cart.length === 0 && customerName === existingOrder.customerName && (currentUser?.role === 'Cajero' || currentUser?.role === 'Administrador') && (
+            {existingOrder && !hasUnsavedChanges && (currentUser?.role === 'Cajero' || currentUser?.role === 'Administrador') && (
               <button 
                 onClick={() => setIsPaymentModalOpen(true)}
                 className="col-span-2 bg-green-500 hover:bg-green-600 text-white py-4 rounded-xl font-bold text-lg transition-colors flex items-center justify-center gap-2"

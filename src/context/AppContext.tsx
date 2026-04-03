@@ -13,11 +13,14 @@ interface AppState {
   kardex: KardexMovement[];
   cashTransactions: CashTransaction[];
   currentShift: CashShift | null;
+  isDarkMode: boolean; // NUEVO
 }
 
 interface AppContextType extends AppState {
   login: (username: string, password: string) => Promise<boolean>;
   logout: () => void;
+  setDarkMode: (dark: boolean) => void; // NUEVO
+  resetInventory: () => Promise<void>; // NUEVO
   addUser: (user: Omit<User, 'id'>) => Promise<void>;
   updateUser: (id: string, user: Partial<User>) => Promise<void>;
   deleteUser: (id: string) => Promise<void>;
@@ -41,6 +44,7 @@ interface AppContextType extends AppState {
 }
 
 const STORAGE_KEY = 'broasteria_erp_data';
+const THEME_KEY = 'broasteria_theme';
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
@@ -57,6 +61,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [kardex, setKardex] = useState<KardexMovement[]>([]);
   const [cashTransactions, setCashTransactions] = useState<CashTransaction[]>([]);
   const [currentShift, setCurrentShift] = useState<CashShift | null>(null);
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
 
   const fetchData = async () => {
     try {
@@ -161,7 +166,41 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   useEffect(() => {
     fetchData();
+    // Cargar tema guardado
+    const savedTheme = localStorage.getItem(THEME_KEY);
+    if (savedTheme === 'dark') setDarkMode(true);
   }, []);
+
+  const setDarkMode = (dark: boolean) => {
+    setIsDarkMode(dark);
+    localStorage.setItem(THEME_KEY, dark ? 'dark' : 'light');
+    if (dark) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  };
+
+  const resetInventory = async () => {
+    try {
+      toast.loading('Reiniciando historial...');
+      
+      // 1. Borrar Kardex
+      await supabase.from('kardex_movements').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      
+      // 2. Borrar Lotes
+      await supabase.from('product_batches').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      
+      // 3. Resetear Stock a 0 en todos los productos
+      await supabase.from('products').update({ stock: 0 }).neq('id', '00000000-0000-0000-0000-000000000000');
+
+      toast.dismiss();
+      toast.success('Inventario reiniciado correctamente');
+      fetchData();
+    } catch (err: any) {
+      toast.error('Error al reiniciar: ' + err.message);
+    }
+  };
 
   const login = async (username: string, password: string) => {
     try {
@@ -298,7 +337,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const addKardexMovement = async (movement: Omit<KardexMovement, 'id' | 'date'>) => {
-    // CORRECCIÓN: Si no hay un ID de usuario válido, enviamos null (Supabase lo permite)
     const validUserId = (movement.userId && movement.userId.length > 10) ? movement.userId : null;
 
     const { error } = await supabase.from('kardex_movements').insert([{
@@ -332,7 +370,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
       await updateProductStock(productId, currentStock + quantity);
 
-      // CORRECCIÓN: Pasar el ID real del usuario o null
       await addKardexMovement({
         productId,
         type: 'Entrada',
@@ -449,8 +486,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   return (
     <AppContext.Provider value={{
-      currentUser, users, tables, categories, products, orders, kardex, cashTransactions, currentShift,
-      login, logout, addUser, updateUser, deleteUser, updateTableStatus, createOrder, updateOrderStatus, updateOrder, addKardexMovement,
+      currentUser, users, tables, categories, products, orders, kardex, cashTransactions, currentShift, isDarkMode,
+      login, logout, setDarkMode, resetInventory, addUser, updateUser, deleteUser, updateTableStatus, createOrder, updateOrderStatus, updateOrder, addKardexMovement,
       openShift, closeShift, addCashTransaction, updateProductStock, addProductBatch, removeProductBatch,
       addCategory, updateCategory, deleteCategory, addProduct, updateProduct, deleteProduct
     }}>

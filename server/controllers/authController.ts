@@ -7,10 +7,18 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
   try {
     const result = await pool.query('SELECT * FROM users WHERE username = $1', [username]);
     const user = result.rows[0];
-    if (!user) return res.status(401).json({ status: 'error', message: 'Usuario o contraseña incorrectos' });
+
+    // Seguridad Senior: Usamos un mensaje genérico para no dar pistas a atacantes
+    const genericError = 'Usuario o contraseña incorrectos';
+
+    if (!user) {
+      return res.status(401).json({ status: 'error', message: genericError });
+    }
 
     const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) return res.status(401).json({ status: 'error', message: 'Usuario o contraseña incorrectos' });
+    if (!isMatch) {
+      return res.status(401).json({ status: 'error', message: genericError });
+    }
 
     const { password: _, ...userWithoutPassword } = user;
     res.json({ status: 'success', user: userWithoutPassword });
@@ -29,7 +37,7 @@ export const register = async (req: Request, res: Response, next: NextFunction) 
     );
     res.status(201).json({ status: 'success', user: result.rows[0] });
   } catch (err: any) {
-    if (err.code === '23505') { // Error de duplicado en PostgreSQL
+    if (err.code === '23505') {
       return res.status(400).json({ status: 'error', message: 'El nombre de usuario ya existe' });
     }
     next(err);

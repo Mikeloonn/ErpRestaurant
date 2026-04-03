@@ -164,20 +164,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     fetchData();
   }, []);
 
-  const resetInventory = async () => {
-    try {
-      toast.loading('Reiniciando historial...');
-      await supabase.from('kardex_movements').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-      await supabase.from('product_batches').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-      await supabase.from('products').update({ stock: 0 }).neq('id', '00000000-0000-0000-0000-000000000000');
-      toast.dismiss();
-      toast.success('Inventario reiniciado correctamente');
-      fetchData();
-    } catch (err: any) {
-      toast.error('Error al reiniciar: ' + err.message);
-    }
-  };
-
   const login = async (username: string, password: string) => {
     try {
       const response = await fetch(`${API_URL}/api/auth/login`, {
@@ -205,6 +191,20 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     toast.info('Sesión cerrada');
   };
 
+  const resetInventory = async () => {
+    try {
+      toast.loading('Reiniciando historial...');
+      await supabase.from('kardex_movements').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      await supabase.from('product_batches').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      await supabase.from('products').update({ stock: 0 }).neq('id', '00000000-0000-0000-0000-000000000000');
+      toast.dismiss();
+      toast.success('Inventario reiniciado correctamente');
+      await fetchData();
+    } catch (err: any) {
+      toast.error('Error al reiniciar: ' + err.message);
+    }
+  };
+
   const addUser = async (userData: Omit<User, 'id'>) => {
     try {
       const response = await fetch(`${API_URL}/api/auth/register`, {
@@ -215,7 +215,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const data = await response.json();
       if (data.status === 'success') {
         toast.success('Usuario creado con éxito');
-        fetchData();
+        await fetchData();
       } else {
         throw new Error(data.message);
       }
@@ -227,13 +227,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const updateUser = async (id: string, userData: Partial<User>) => {
     const { error } = await supabase.from('users').update(userData).eq('id', id);
     if (error) throw error;
-    fetchData();
+    await fetchData();
   };
 
   const deleteUser = async (id: string) => {
     const { error } = await supabase.from('users').delete().eq('id', id);
     if (error) throw error;
-    fetchData();
+    await fetchData();
   };
 
   const updateTableStatus = async (id: string, status: Table['status'], orderId?: string) => {
@@ -242,7 +242,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       current_order_id: status === 'Libre' ? null : (orderId || null) 
     }).eq('id', id);
     if (error) throw error;
-    fetchData();
+    await fetchData();
   };
 
   const createOrder = async (orderData: Omit<Order, 'id' | 'createdAt' | 'status'>) => {
@@ -297,18 +297,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         updateData.customer_address = paymentData.customerAddress || order.customerAddress;
       }
 
-      // 1. Actualizar el pedido en Supabase
       const { error: orderError } = await supabase.from('orders').update(updateData).eq('id', id);
       if (orderError) throw orderError;
 
-      // 2. Si es Mesa y se libera (Pagada/Anulada), actualizar la mesa
       if (order.tableId && (status === 'Pagada' || status === 'Anulada')) {
         await updateTableStatus(order.tableId, 'Libre', undefined);
       } else if (order.tableId && status === 'Precuenta') {
         await updateTableStatus(order.tableId, 'Precuenta', order.id);
       }
 
-      // 3. Si se paga, registrar en caja
       if (status === 'Pagada') {
         await addCashTransaction({
           type: 'Ingreso',
@@ -322,7 +319,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         toast.success('Precuenta marcada en mesa');
       }
 
-      // 4. RECARGAR TODO PARA ACTUALIZAR LA INTERFAZ
       await fetchData();
     } catch (err: any) {
       toast.error('Error al actualizar estado: ' + err.message);
@@ -351,13 +347,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       user_id: validUserId
     }]);
     if (error) throw error;
-    fetchData();
+    await fetchData();
   };
 
   const updateProductStock = async (id: string, newStock: number) => {
     const { error } = await supabase.from('products').update({ stock: newStock }).eq('id', id);
     if (error) throw error;
-    fetchData();
+    await fetchData();
   };
 
   const addProductBatch = async (productId: string, quantity: number, expirationDate: string) => {
@@ -388,7 +384,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const removeProductBatch = async (productId: string, batchId: string, reason: string) => {
     const { error } = await supabase.from('product_batches').delete().eq('id', batchId);
     if (error) throw error;
-    fetchData();
+    await fetchData();
   };
 
   const openShift = async (initialAmount: number) => {
@@ -399,7 +395,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       status: 'Abierta'
     }]);
     if (error) throw error;
-    fetchData();
+    await fetchData();
     toast.success('Turno de caja abierto');
   };
 
@@ -412,7 +408,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       closed_at: new Date().toISOString()
     }).eq('id', currentShift.id);
     if (error) throw error;
-    fetchData();
+    await fetchData();
     toast.info('Turno de caja cerrado');
   };
 
@@ -428,25 +424,25 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       payment_method: transaction.paymentMethod
     }]);
     if (error) throw error;
-    fetchData();
+    await fetchData();
   };
 
   const addCategory = async (categoryData: Omit<Category, 'id'>) => {
     const { error } = await supabase.from('categories').insert([categoryData]);
     if (error) throw error;
-    fetchData();
+    await fetchData();
   };
 
   const updateCategory = async (id: string, categoryData: Partial<Category>) => {
     const { error } = await supabase.from('categories').update(categoryData).eq('id', id);
     if (error) throw error;
-    fetchData();
+    await fetchData();
   };
 
   const deleteCategory = async (id: string) => {
     const { error } = await supabase.from('categories').delete().eq('id', id);
     if (error) throw error;
-    fetchData();
+    await fetchData();
   };
 
   const addProduct = async (productData: Omit<Product, 'id'>) => {
@@ -459,7 +455,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       modifiers: productData.modifiers
     }]);
     if (error) throw error;
-    fetchData();
+    await fetchData();
   };
 
   const updateProduct = async (id: string, productData: Partial<Product>) => {
@@ -474,13 +470,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
     const { error } = await supabase.from('products').update(updatePayload).eq('id', id);
     if (error) throw error;
-    fetchData();
+    await fetchData();
   };
 
   const deleteProduct = async (id: string) => {
     const { error } = await supabase.from('products').delete().eq('id', id);
     if (error) throw error;
-    fetchData();
+    await fetchData();
   };
 
   return (

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
-import { User, Table, Category, Product, Order, KardexMovement, CashTransaction, CashShift, PaymentMethod } from '../types';
+import { User, Table, Category, Product, Order, KardexMovement, CashTransaction, CashShift, PaymentMethod, ProductBatch } from '../types';
 import { supabase } from '../lib/supabase';
 import { toast } from 'sonner';
 
@@ -66,12 +66,26 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const { data: catData } = await supabase.from('categories').select('*');
       if (catData) setCategories(catData as Category[]);
 
+      // 1. Cargar lotes primero
+      const { data: allBatchesData } = await supabase.from('product_batches').select('*');
+      const allBatches = allBatchesData || [];
+
+      // 2. Cargar productos y pegarles sus lotes
       const { data: prodData } = await supabase.from('products').select('*');
       if (prodData) {
         setProducts(prodData.map((p: any) => ({
           ...p,
           categoryId: p.category_id,
-          minStock: p.min_stock
+          minStock: p.min_stock,
+          batches: allBatches
+            .filter((b: any) => b.product_id === p.id)
+            .map((b: any) => ({
+              id: b.id,
+              quantity: b.quantity,
+              expirationDate: b.expiration_date,
+              dateAdded: b.date_added,
+              productId: b.product_id
+            }))
         })));
       }
 
@@ -304,14 +318,38 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const addProductBatch = async (productId: string, quantity: number, expirationDate: string) => {
-    const { error } = await supabase.from('product_batches').insert([{
-      product_id: productId,
-      quantity,
-      expiration_date: expirationDate
-    }]);
-    if (error) throw error;
-    const product = products.find(p => p.id === productId);
-    if (product) await updateProductStock(productId, Number(product.stock) + quantity);
+    try {
+      // 1. Insertar el lote en Supabase
+      const { error: batchError } = await supabase.from('product_batches').insert([{
+        product_id: productId,
+        quantity,
+        expiration_date: expirationDate
+      }]);
+      if (batchError) throw batchError;
+
+      // 2. Obtener stock real actual de la base de datos
+      const { data: prodData } = await supabase.from('products').select('stock').eq('id', productId).single();
+      const currentStock = prodData ? Number(prodData.stock) : 0;
+
+      // 3. Actualizar el stock sumando el nuevo lote
+      await updateProductStock(productId, currentStock + quantity);
+
+      // 4. Registrar en el Kardex
+      await addKardexMovement({
+        productId,
+        type: 'Entrada',
+        quantity,
+        reason: `Ingreso de Lote (Vence: ${expirationDate})`,
+        userId: currentUser?.id || 'system'
+      });
+
+      toast.success('Lote registrado e inventario actualizado');
+      
+      // 5. RECARGAR TODO PARA FORZAR LA ACTUALIZACIÓN DE LA UI
+      await fetchData();
+    } catch (err: any) {
+      toast.error('Error al registrar lote: ' + err.message);
+    }
   };
 
   const removeProductBatch = async (productId: string, batchId: string, reason: string) => {

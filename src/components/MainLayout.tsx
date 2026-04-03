@@ -11,7 +11,7 @@ import { SettingsView } from './SettingsView';
 type Module = 'POS' | 'Catalogo' | 'Caja' | 'Usuarios' | 'Inventario' | 'Configuraciones';
 
 export const MainLayout: React.FC = () => {
-  const { currentUser, logout, isDarkMode } = useAppContext();
+  const { currentUser, logout } = useAppContext();
   const [activeModule, setActiveModule] = useState<Module>('POS');
 
   const navItems: { id: Module; label: string; icon: React.ReactNode; roles: string[] }[] = [
@@ -26,7 +26,7 @@ export const MainLayout: React.FC = () => {
   const allowedNavItems = navItems.filter(item => currentUser && item.roles.includes(currentUser.role));
 
   return (
-    <div className={`flex h-screen overflow-hidden font-sans ${isDarkMode ? 'dark' : ''}`}>
+    <div className="flex h-screen overflow-hidden font-sans">
       {/* Sidebar */}
       <div className="w-64 bg-zinc-900 text-zinc-300 flex flex-col shrink-0">
         <div className="p-6">
@@ -75,12 +75,12 @@ export const MainLayout: React.FC = () => {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col overflow-hidden bg-zinc-100 dark:bg-zinc-950 transition-colors">
-        <header className="bg-white dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 px-8 py-4 flex items-center justify-between shrink-0 transition-colors">
-          <h2 className="text-2xl font-bold text-zinc-800 dark:text-white">
+      <div className="flex-1 flex flex-col overflow-hidden bg-zinc-100 transition-colors">
+        <header className="bg-white border-b border-zinc-200 px-8 py-4 flex items-center justify-between shrink-0 transition-colors">
+          <h2 className="text-2xl font-bold text-zinc-800">
             {navItems.find(i => i.id === activeModule)?.label}
           </h2>
-          <div className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
+          <div className="text-sm font-medium text-zinc-500">
             {new Date().toLocaleDateString('es-PE', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
           </div>
         </header>
